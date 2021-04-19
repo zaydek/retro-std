@@ -1,58 +1,58 @@
 import * as React from "react"
 import * as store from "../store"
-import * as T from "./types"
-import * as utils from "./utils"
+import * as t from "./types"
 
-type RouteEventType = "PUSH" | "REPLACE"
+import {
+	getPathnameSSR,
+	useLayoutEffectSSR,
+} from "./utils"
 
-interface RouterState {
-	type: RouteEventType
-	path: string
-	scrollTo?: T.ScrollTo
-}
-
-// routerStore describes the router as a store. The router can change the
-// current path (window.location.pathname) as a pushState or replaceState event,
-// and scrollTo to a number or [number, number].
-//
-// TODO: Implement synthetic pushState and replaceState functions?
-const routerStore = store.createStore<RouterState>({
-	// TODO: Add support for key
-	path: utils.getBrowserPath(),
+export const routerStore = store.createStore<t.RouterState>({
+	href: getPathnameSSR(),
 	type: "PUSH",
-	scrollTo: [0, 0],
 })
 
-export const Link: T.Link = ({ path, scrollTo, children, ...props }) => {
+export function Link({ href, scrollTo, children, ...props }: t.LinkProps) {
 	const setRouter = store.useStoreSetState(routerStore)
 
-	function handleClick(e: React.MouseEvent): void {
+	function handleClick(e: React.MouseEvent) {
 		e.preventDefault()
-		setRouter({ type: "PUSH", path, scrollTo })
+		setRouter({ type: "PUSH", href, scrollTo })
 	}
 
-	const scoped = path.startsWith("/")
+	const scoped = href.startsWith("/")
 	return (
-		<a href={path} target={scoped ? undefined : "_blank"} rel={scoped ? undefined : "noreferrer noopener"}
+		<a href={href} target={scoped ? undefined : "_blank"} rel={scoped ? undefined : "noreferrer noopener"}
 			onClick={scoped ? handleClick : undefined} {...props}>
 			{children}
 		</a>
 	)
 }
 
-export const Route: T.Route = ({ children }) => {
+export function Redirect({ href, scrollTo }: t.RedirectProps) {
+	const [, setState] = store.useStore(routerStore)
+	useLayoutEffectSSR(() => {
+		setState({
+			type: "REPLACE",
+			href,
+			scrollTo,
+		})
+	}, [href, scrollTo, setState])
+	return null
+}
+
+export function Route({ children }: t.RouteProps) {
 	return <>{children}</>
 }
 
-export const Router: T.Router = ({ children }) => {
+export function Router({ children }: t.RouterProps) {
 	const [router, setRouter] = store.useStore(routerStore)
 
 	React.useEffect(() => {
-		function handlePopState(): void {
+		function handlePopState() {
 			setRouter({
 				type: "REPLACE",
-				path: utils.getBrowserPath(),
-				scrollTo: [0, 0],
+				href: getPathnameSSR(),
 			})
 		}
 		window.addEventListener("popstate", handlePopState)
@@ -65,19 +65,16 @@ export const Router: T.Router = ({ children }) => {
 			onceRef.current = true
 			return
 		}
-		// window.pushState / window.replaceState
-		let { path, scrollTo } = router
-		if (path !== utils.getBrowserPath()) {
-			let emitHistoryEvent: Function
-			if (router.type === "PUSH") {
-				emitHistoryEvent = (): void => window.history.pushState({}, "", path)
-			} else if (router.type === "REPLACE") {
-				emitHistoryEvent = (): void => window.history.replaceState({}, "", path)
+		let { href: href, scrollTo } = router
+		scrollTo ??= 0
+		if (href === getPathnameSSR()) {
+			if (router.type === "REPLACE") {
+				window.history.pushState({}, "", href)
+			} else if (router.type === "PUSH") {
+				window.history.replaceState({}, "", href)
 			}
-			emitHistoryEvent!()
 		}
-		// window.scrollTo
-		if (scrollTo !== undefined && scrollTo !== "no-op") {
+		if (scrollTo !== "no-op") {
 			const x = !Array.isArray(scrollTo) ? 0 : scrollTo[0]
 			const y = !Array.isArray(scrollTo) ? scrollTo : scrollTo[1]
 			window.scrollTo(x, y)
@@ -86,19 +83,20 @@ export const Router: T.Router = ({ children }) => {
 
 	// Cache routes so rerenders are O(1)
 	const cachedRoutes = React.useMemo(() => {
-		type RouteMap = { [key: string]: React.ReactElement<T.Route> }
+		type RouteMap = Record<string, React.ReactElement<typeof Route>>
 
-		// Maps paths to components
+		// Maps hrefs to components
 		const routeMap: RouteMap = {}
-		React.Children.forEach(children, child => {
-			if (!React.isValidElement(child)) return
-			if (child?.type === Route && !!child?.props?.path) {
-				routeMap[child.props.path] = child
+		for (const child of [children].flat()) {
+			if (!React.isValidElement(child)) {
+				continue
 			}
-		})
+			if (child?.type === Route && !!(child?.props?.href)) {
+				routeMap[child.props.href] = child
+			}
+		}
 		return routeMap
 	}, [children])
 
-	const route = cachedRoutes[router.path] || cachedRoutes["/404"]
-	return <>{route}</>
+	return <>{cachedRoutes[router.href] || cachedRoutes["/404"]}</>
 }

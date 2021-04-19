@@ -1,6 +1,6 @@
 import STORE_KEY from "./STORE_KEY"
 
-export function freezeOnce<T>(v: T): T {
+export function freezeOnce<Type>(v: Type): Type {
 	if (typeof v !== "object") { return v }
 	return !Object.isFrozen(v) ? v : Object.freeze(v)
 }

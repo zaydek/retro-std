@@ -37,7 +37,7 @@ function useStoreImpl<State>(caller: string, store: t.Store<State>, reducer?: t.
 
 	// Run checks once
 	React.useMemo(() => {
-		if (testStore(store) === false) {
+		if (!testStore(store)) {
 			throw new Error(errBadCreateStore(caller))
 		}
 		if (!!reducer && typeof reducer !== "function") {
@@ -45,9 +45,8 @@ function useStoreImpl<State>(caller: string, store: t.Store<State>, reducer?: t.
 		}
 	}, [])
 
-
 	const [state, setState] = React.useState(store.cachedState)
-	const frozen = freezeOnce(state)
+	const frozenState = freezeOnce(state)
 
 	// Manages subscriptions when a component mounts / unmounts
 	React.useEffect(() => {
@@ -72,9 +71,8 @@ function useStoreImpl<State>(caller: string, store: t.Store<State>, reducer?: t.
 		if (!(!!reducer)) {
 			return null
 		}
-		return Object.keys(reducer(frozen))
+		return Object.keys(reducer(frozenState))
 	}, [])
-
 
 	// Does not use React.useMemo because state changes on every pass
 	let fns = null
@@ -83,9 +81,9 @@ function useStoreImpl<State>(caller: string, store: t.Store<State>, reducer?: t.
 		// component (`xxx`) while rendering a different component (`xxx`).
 		fns = reducerKeys.reduce<t.Methods<State>>((accum, type) => {
 			accum[type] = (...args) => {
-				const next = reducer(frozen)[type]!(...args)
-				setStore(next)
-				return next
+				const nextState = reducer(frozenState)[type]!(...args)
+				setStore(nextState)
+				return nextState
 			}
 			return accum
 		}, {})
@@ -93,10 +91,10 @@ function useStoreImpl<State>(caller: string, store: t.Store<State>, reducer?: t.
 
 	// useStore
 	if (!(!!fns)) {
-		return [frozen, setStore]
+		return [frozenState, setStore]
 	}
 	// useStoreReducer
-	return [frozen, fns]
+	return [frozenState, fns]
 }
 
 export function useStore<State>(store: t.Store<State>): [State, React.Dispatch<State>] {
