@@ -1,9 +1,6 @@
-// Change to `import * as store from "@zaydek/retro-std/store"`
-import * as store from "../../npm/store"
-
 // Change to `import * as router from "@zaydek/retro-std/router"`
 import * as router from "../../npm/router"
-const { Link, Route, Router } = router
+const { Link, Redirect, Route, Router } = router
 
 function Nav() {
 	const hrefs = [
@@ -25,20 +22,6 @@ function Nav() {
 			</>
 		</ul>
 	)
-}
-
-const useLayoutEffectSSR = typeof window === "undefined" ? React.useEffect : React.useLayoutEffect
-
-function Redirect({ href, scrollTo }) {
-	const [, setState] = store.useStore(router.routerStore)
-	useLayoutEffectSSR(() => {
-		setState({
-			type: "REPLACE",
-			href,
-			scrollTo,
-		})
-	}, [href, scrollTo, setState])
-	return null
 }
 
 export default function App() {

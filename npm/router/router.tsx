@@ -2,17 +2,14 @@ import * as React from "react"
 import * as store from "../store"
 import * as t from "./types"
 
-import {
-	getPathnameSSR,
-	useLayoutEffectSSR,
-} from "./utils"
+import { getPathnameSSR, useLayoutEffectSSR } from "./utils"
 
 export const routerStore = store.createStore<t.RouterState>({
 	href: getPathnameSSR(),
 	type: "PUSH",
 })
 
-export function Link({ href, scrollTo, children, ...props }: t.LinkProps) {
+export function Link({ href, scrollTo, children, ...props }: t.LinkProps): JSX.Element {
 	const setRouter = store.useStoreSetState(routerStore)
 
 	function handleClick(e: React.MouseEvent) {
@@ -29,7 +26,7 @@ export function Link({ href, scrollTo, children, ...props }: t.LinkProps) {
 	)
 }
 
-export function Redirect({ href, scrollTo }: t.RedirectProps) {
+export function Redirect({ href, scrollTo }: t.RedirectProps): null {
 	const [, setState] = store.useStore(routerStore)
 	useLayoutEffectSSR(() => {
 		setState({
@@ -41,11 +38,11 @@ export function Redirect({ href, scrollTo }: t.RedirectProps) {
 	return null
 }
 
-export function Route({ children }: t.RouteProps) {
+export function Route({ children }: t.RouteProps): JSX.Element {
 	return <>{children}</>
 }
 
-export function Router({ children }: t.RouterProps) {
+export function Router({ children }: t.RouterProps): JSX.Element {
 	const [router, setRouter] = store.useStore(routerStore)
 
 	React.useEffect(() => {
